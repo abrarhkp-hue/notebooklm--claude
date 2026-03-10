@@ -103,6 +103,7 @@ from .types import (
     Note,
     Notebook,
     NotebookDescription,
+    NotebookMetadata,
     QuizDifficulty,
     QuizQuantity,
     ReportFormat,
@@ -117,6 +118,7 @@ from .types import (
     Source,
     SourceFulltext,
     SourceStatus,
+    SourceSummary,
     SourceType,
     # Enums for configuration
     SuggestedTopic,
@@ -136,6 +138,8 @@ __all__ = [
     # Types
     "Notebook",
     "NotebookDescription",
+    "NotebookMetadata",
+    "SourceSummary",
     "SuggestedTopic",
     "Source",
     "SourceFulltext",
@@ -146,9 +150,9 @@ __all__ = [
     "ConversationTurn",
     "ChatReference",
     "AskResult",
-    "ChatMode",
     "SharedUser",
     "ShareStatus",
+    "ChatMode",
     # Base Exceptions
     "NotebookLMError",
     "ValidationError",

@@ -22,15 +22,15 @@ class ResearchAPI:
 
     Usage:
         async with NotebookLMClient.from_storage() as client:
-            # Start research
-            task = await client.research.start(notebook_id, "quantum computing")
+            # Start deep research
+            task = await client.research.start(notebook_id, "quantum computing", mode="deep")
 
             # Poll for results
             result = await client.research.poll(notebook_id)
             if result["status"] == "completed":
-                # Import selected sources
+                # Import selected sources AND preserve the deep research report
                 imported = await client.research.import_sources(
-                    notebook_id, task["task_id"], result["sources"][:5]
+                    notebook_id, task["task_id"], result["sources"][:5], report_id=task["report_id"]
                 )
     """
 
@@ -197,6 +197,7 @@ class ResearchAPI:
         notebook_id: str,
         task_id: str,
         sources: list[dict[str, str]],
+        report_id: str | None = None,
     ) -> list[dict[str, str]]:
         """Import selected research sources into the notebook.
 
@@ -204,6 +205,8 @@ class ResearchAPI:
             notebook_id: The notebook ID.
             task_id: The research task ID.
             sources: List of sources to import, each with 'url' and 'title'.
+            report_id: Optional report ID from deep research to preserve. If provided,
+                the deep research report will be preserved after import.
 
         Returns:
             List of imported sources with 'id' and 'title'.
@@ -244,7 +247,13 @@ class ResearchAPI:
             for src in valid_sources
         ]
 
-        params = [None, [1], task_id, notebook_id, source_array]
+        # Include report_id if provided to preserve deep research report
+        # Using conditional expression to maintain mypy type inference
+        params: list[object] = (
+            [report_id, [1], task_id, notebook_id, source_array]
+            if report_id
+            else [None, [1], task_id, notebook_id, source_array]
+        )
 
         result = await self._core.rpc_call(
             RPCMethod.IMPORT_RESEARCH,

@@ -244,6 +244,8 @@ __all__ = [
     # Dataclasses
     "Notebook",
     "NotebookDescription",
+    "NotebookMetadata",
+    "SourceSummary",
     "SuggestedTopic",
     "Source",
     "SourceFulltext",
@@ -386,6 +388,103 @@ class NotebookDescription:
         return cls(
             summary=data.get("summary", ""),
             suggested_topics=topics,
+        )
+
+
+@dataclass
+class SourceSummary:
+    """Summary information about a source in a notebook."""
+
+    id: str
+    title: str | None
+    url: str | None = None
+    kind: SourceType = SourceType.UNKNOWN
+
+
+@dataclass
+class NotebookMetadata:
+    """Metadata for a NotebookLM notebook, including sources."""
+
+    id: str
+    title: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    sources: list[SourceSummary] = field(default_factory=list)
+
+    @classmethod
+    def from_notebook_response(cls, notebook_data: list[Any]) -> "NotebookMetadata":
+        """Parse notebook metadata from GET_NOTEBOOK response.
+
+        Args:
+            notebook_data: Raw notebook data from API response.
+
+        Returns:
+            NotebookMetadata instance.
+        """
+        if not notebook_data or not isinstance(notebook_data, list):
+            return cls(id="", title="")
+
+        # Notebook info is at notebook[0]
+        nb_info = notebook_data[0] if isinstance(notebook_data[0], list) else notebook_data
+
+        # Extract basic info (same as Notebook.from_api_response)
+        raw_title = nb_info[0] if len(nb_info) > 0 and isinstance(nb_info[0], str) else ""
+        title = raw_title.replace("thought\n", "").strip()
+        notebook_id = nb_info[2] if len(nb_info) > 2 and isinstance(nb_info[2], str) else ""
+
+        # Extract timestamps
+        created_at = None
+        updated_at = None
+        if len(nb_info) > 5 and isinstance(nb_info[5], list):
+            ts_data = nb_info[5]
+            # Creation timestamp at [5]
+            if len(ts_data) > 5 and isinstance(ts_data[5], list) and len(ts_data[5]) > 0:
+                try:
+                    created_at = datetime.fromtimestamp(ts_data[5][0])
+                except (TypeError, ValueError):
+                    pass
+            # Updated timestamp at [6]
+            if len(ts_data) > 6 and isinstance(ts_data[6], list) and len(ts_data[6]) > 0:
+                try:
+                    updated_at = datetime.fromtimestamp(ts_data[6][0])
+                except (TypeError, ValueError):
+                    pass
+
+        # Extract sources at [1]
+        sources: list[SourceSummary] = []
+        if len(nb_info) > 1 and isinstance(nb_info[1], list):
+            for src in nb_info[1]:
+                if isinstance(src, list) and len(src) > 0:
+                    src_id = src[0] if isinstance(src[0], str) else ""
+                    src_title = src[1] if len(src) > 1 else None
+                    src_url = None
+                    src_type = SourceType.UNKNOWN
+
+                    # Extract URL and type from metadata at [2]
+                    if len(src) > 2 and isinstance(src[2], list):
+                        # URL at [2][7][0]
+                        if len(src[2]) > 7 and isinstance(src[2][7], list):
+                            url_list = src[2][7]
+                            src_url = url_list[0] if url_list else None
+                        # Type code at [2][4]
+                        if len(src[2]) > 4 and isinstance(src[2][4], int):
+                            src_type = _safe_source_type(src[2][4])
+
+                    sources.append(
+                        SourceSummary(
+                            id=str(src_id),
+                            title=src_title,
+                            url=src_url,
+                            kind=src_type,
+                        )
+                    )
+
+        return cls(
+            id=notebook_id,
+            title=title,
+            created_at=created_at,
+            updated_at=updated_at,
+            sources=sources,
         )
 
 

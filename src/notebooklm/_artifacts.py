@@ -1058,7 +1058,27 @@ class ArtifactsAPI:
                     details="Could not extract download URL",
                 )
 
-            return await self._download_url(url, output_path)
+            result_path = await self._download_url(url, output_path)
+
+            # Validate that the file was actually written successfully
+            output_file = Path(result_path)
+            if not output_file.exists():
+                raise ArtifactDownloadError(
+                    "audio",
+                    artifact_id=artifact_id,
+                    details=f"Audio download failed: file not written to {output_path}",
+                )
+            file_size = output_file.stat().st_size
+            if file_size == 0:
+                # Clean up empty file
+                output_file.unlink(missing_ok=True)
+                raise ArtifactDownloadError(
+                    "audio",
+                    artifact_id=artifact_id,
+                    details=f"Audio download failed: file is empty ({output_path})",
+                )
+
+            return result_path
 
         except (IndexError, TypeError) as e:
             raise ArtifactParseError(
@@ -1141,7 +1161,26 @@ class ArtifactsAPI:
             if not url:
                 raise ArtifactDownloadError("media", details="Could not extract download URL")
 
-            return await self._download_url(url, output_path)
+            result_path = await self._download_url(url, output_path)
+
+            # Validate that the file was actually written successfully
+            # Video downloads may fail silently even when generation succeeds
+            output_file = Path(result_path)
+            if not output_file.exists():
+                raise ArtifactDownloadError(
+                    "video",
+                    details=f"Video download failed: file not written to {output_path}",
+                )
+            file_size = output_file.stat().st_size
+            if file_size == 0:
+                # Clean up empty file
+                output_file.unlink(missing_ok=True)
+                raise ArtifactDownloadError(
+                    "video",
+                    details=f"Video download failed: file is empty ({output_path})",
+                )
+
+            return result_path
 
         except (IndexError, TypeError) as e:
             raise ArtifactParseError(

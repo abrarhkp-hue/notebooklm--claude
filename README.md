@@ -86,6 +86,8 @@ These features are available via API/CLI but not exposed in NotebookLM's web int
 
 ## Installation
 
+### Using pip
+
 ```bash
 # Basic installation
 pip install notebooklm-py
@@ -95,12 +97,32 @@ pip install "notebooklm-py[browser]"
 playwright install chromium
 ```
 
+### Using uv (recommended)
+
+[uv](https://github.com/astral-sh/uv) is a fast Python package manager written in Rust:
+
+```bash
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Basic installation
+uv pip install notebooklm-py
+
+# With browser login support
+uv pip install "notebooklm-py[browser]"
+playwright install chromium
+```
+
 ### Development Installation
 
 For contributors or testing unreleased features:
 
 ```bash
+# Using pip
 pip install git+https://github.com/teng-lin/notebooklm-py@main
+
+# Using uv
+uv pip install git+https://github.com/teng-lin/notebooklm-py@main
 ```
 
 ⚠️ The main branch may contain unstable changes. Use PyPI releases for production.
