@@ -14,6 +14,8 @@ import json
 import logging
 import os
 import time
+import uuid
+import re
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -262,10 +264,11 @@ async def _resolve_partial_id(
     """Generic partial ID resolver.
 
     Allows users to type partial IDs like 'abc' instead of full UUIDs.
+    Also supports matching by title for convenience.
     Matches are case-insensitive prefix matches.
 
     Args:
-        partial_id: Full or partial ID to resolve
+        partial_id: Full or partial ID to resolve (or title to match)
         list_fn: Async function that returns list of items with id/title attributes
         entity_name: Name for error messages (e.g., "notebook", "source")
         list_command: CLI command to list items (e.g., "list", "source list")
@@ -279,28 +282,58 @@ async def _resolve_partial_id(
     # Validate and normalize the ID
     partial_id = validate_id(partial_id, entity_name)
 
-    # Skip resolution for IDs that look complete (20+ chars)
-    if len(partial_id) >= 20:
+    # Check if it looks like a UUID - only skip resolution for actual UUIDs
+    # UUIDs have a specific format: 8-4-4-4-12 hex chars with dashes
+    # Example: 03abe51c-d8df-43ba-ae2d-0efe02c71c4a
+    is_uuid_format = bool(re.match(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+        partial_id.lower()
+    ))
+
+    # Skip resolution only for actual UUIDs (full format)
+    if len(partial_id) >= 36 and is_uuid_format:
         return partial_id
 
     items = await list_fn()
+    
+    # First, try to match by ID prefix
     matches = [item for item in items if item.id.lower().startswith(partial_id.lower())]
 
+    # If no ID match, try to match by title (case-insensitive substring)
+    if len(matches) == 0:
+        matches = [
+            item for item in items 
+            if item.title and partial_id.lower() in item.title.lower()
+        ]
+
     if len(matches) == 1:
+        match_type = "ID" if matches[0].id.lower().startswith(partial_id.lower()) else "title"
         if matches[0].id != partial_id:
             title = matches[0].title or "(untitled)"
-            console.print(f"[dim]Matched: {matches[0].id[:12]}... ({title})[/dim]")
+            console.print(f"[dim]Matched: {matches[0].id[:12]}... ({title}) by {match_type}[/dim]")
         return matches[0].id
     elif len(matches) == 0:
         raise click.ClickException(
-            f"No {entity_name} found starting with '{partial_id}'. "
+            f"No {entity_name} found matching '{partial_id}'. "
             f"Run 'notebooklm {list_command}' to see available {entity_name}s."
         )
     else:
-        lines = [f"Ambiguous ID '{partial_id}' matches {len(matches)} {entity_name}s:"]
+        # Check if matches are from title vs ID
+        id_matches = [m for m in matches if m.id.lower().startswith(partial_id.lower())]
+        title_matches = [m for m in matches if m.title and partial_id.lower() in m.title.lower()]
+        
+        lines = []
+        if id_matches and title_matches:
+            lines.append(f"Ambiguous input '{partial_id}' matches {len(id_matches)} {entity_name}(s) by ID and {len(title_matches)} by title:")
+        elif id_matches:
+            lines.append(f"Ambiguous ID '{partial_id}' matches {len(matches)} {entity_name}s:")
+        else:
+            lines.append(f"Ambiguous title '{partial_id}' matches {len(matches)} {entity_name}s:")
+            
         for item in matches[:5]:
             title = item.title or "(untitled)"
-            lines.append(f"  {item.id[:12]}... {title}")
+            match_src = "ID" if item.id.lower().startswith(partial_id.lower()) else "title"
+            lines.append(f"  {item.id[:12]}... {title} [{match_src}]")
         if len(matches) > 5:
             lines.append(f"  ... and {len(matches) - 5} more")
         lines.append("\nSpecify more characters to narrow down.")
