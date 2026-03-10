@@ -221,6 +221,17 @@ def register_session_commands(cli):
 
             input("[Press ENTER when logged in] ")
 
+            # Navigate to accounts.google.com to ensure .google.com cookies are set
+            # (fixes UK/regional users whose cookies land on .google.co.uk)
+            # See: https://github.com/teng-lin/notebooklm-py/issues/146
+            try:
+                page.goto("https://accounts.google.com/", wait_until="networkidle", timeout=10000)
+                page.goto("https://myaccount.google.com/", wait_until="networkidle", timeout=10000)
+                # Return to NotebookLM to capture its specific cookies too
+                page.goto("https://notebooklm.google.com/", wait_until="networkidle", timeout=10000)
+            except Exception as e:
+                logger.debug(f"Cross-domain cookie navigation failed: {e}")
+
             current_url = page.url
             if "notebooklm.google.com" not in current_url:
                 console.print(f"[yellow]Warning: Current URL is {current_url}[/yellow]")

@@ -197,6 +197,7 @@ class ResearchAPI:
         notebook_id: str,
         task_id: str,
         sources: list[dict[str, str]],
+        allow_title_only: bool = False,
     ) -> list[dict[str, str]]:
         """Import selected research sources into the notebook.
 
@@ -204,6 +205,8 @@ class ResearchAPI:
             notebook_id: The notebook ID.
             task_id: The research task ID.
             sources: List of sources to import, each with 'url' and 'title'.
+            allow_title_only: If True, allow importing sources without URLs
+                (e.g., deep research sources that only have titles).
 
         Returns:
             List of imported sources with 'id' and 'title'.
@@ -220,29 +223,52 @@ class ResearchAPI:
             return []
 
         # Filter out sources without URLs - these cause the entire batch to fail
-        valid_sources = [s for s in sources if s.get("url")]
-        skipped_count = len(sources) - len(valid_sources)
-        if skipped_count > 0:
-            logger.warning("Skipping %d source(s) without URLs (cannot be imported)", skipped_count)
+        # However, deep research sources often only have titles without URLs
+        if allow_title_only:
+            valid_sources = sources
+        else:
+            valid_sources = [s for s in sources if s.get("url")]
+            skipped_count = len(sources) - len(valid_sources)
+            if skipped_count > 0:
+                logger.warning("Skipping %d source(s) without URLs (cannot be imported)", skipped_count)
         if not valid_sources:
             return []
 
-        source_array = [
-            [
-                None,
-                None,
-                [src["url"], src.get("title", "Untitled")],
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                2,
-            ]
-            for src in valid_sources
-        ]
+        source_array = []
+        for src in valid_sources:
+            url = src.get("url")
+            title = src.get("title", "Untitled")
+            if url:
+                # Standard source with URL
+                source_array.append([
+                    None,
+                    None,
+                    [url, title],
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    2,
+                ])
+            else:
+                # Title-only source (e.g., deep research results)
+                # Format: [None, title, None, type, ...]
+                source_array.append([
+                    None,
+                    title,
+                    None,
+                    1,  # source type
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    2,
+                ])
 
         params = [None, [1], task_id, notebook_id, source_array]
 
