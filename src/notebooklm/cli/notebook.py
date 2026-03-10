@@ -6,6 +6,7 @@ Commands:
     delete     Delete a notebook
     rename     Rename a notebook
     summary    Get notebook summary with AI-generated insights
+    metadata   Get notebook metadata including sources
 
 Note: Sharing commands moved to 'share' command group.
 """
@@ -196,5 +197,85 @@ def register_notebook_commands(cli):
                             console.print(f"  {i}. {topic.question}")
                 else:
                     console.print("[yellow]No summary available[/yellow]")
+
+        return _run()
+
+    @cli.command("metadata")
+    @click.option(
+        "-n",
+        "--notebook",
+        "notebook_id",
+        default=None,
+        help="Notebook ID (uses current if not set). Supports partial IDs.",
+    )
+    @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+    @with_client
+    def metadata_cmd(ctx, notebook_id, json_output, client_auth):
+        """Get notebook metadata including sources.
+
+        NOTEBOOK_ID supports partial matching (e.g., 'abc' matches 'abc123...').
+
+        \b
+        Examples:
+          notebooklm metadata                    # Current notebook
+          notebooklm metadata -n abc123           # Specific notebook
+          notebooklm metadata --json              # JSON output
+        """
+        notebook_id = require_notebook(notebook_id)
+
+        async def _run():
+            async with NotebookLMClient(client_auth) as client:
+                resolved_id = await resolve_notebook_id(client, notebook_id)
+                metadata = await client.notebooks.get_metadata(resolved_id)
+
+                if json_output:
+                    data = {
+                        "id": metadata.id,
+                        "title": metadata.title,
+                        "created_at": metadata.created_at.isoformat()
+                        if metadata.created_at
+                        else None,
+                        "updated_at": metadata.updated_at.isoformat()
+                        if metadata.updated_at
+                        else None,
+                        "sources": [
+                            {
+                                "id": s.id,
+                                "title": s.title,
+                                "kind": s.kind.value if s.kind else None,
+                                "url": s.url,
+                            }
+                            for s in metadata.sources
+                        ],
+                    }
+                    json_output_response(data)
+                    return
+
+                console.print(f"[bold]Notebook:[/bold] {metadata.title}")
+                console.print(f"[bold]ID:[/bold] {metadata.id}")
+                if metadata.created_at:
+                    console.print(
+                        f"[bold]Created:[/bold] {metadata.created_at.strftime('%Y-%m-%d %H:%M')}"
+                    )
+                if metadata.updated_at:
+                    console.print(
+                        f"[bold]Updated:[/bold] {metadata.updated_at.strftime('%Y-%m-%d %H:%M')}"
+                    )
+
+                if metadata.sources:
+                    console.print(f"\n[bold cyan]Sources ({len(metadata.sources)}):[/bold cyan]")
+                    table = Table()
+                    table.add_column("Type", style="cyan")
+                    table.add_column("Title", style="green")
+                    table.add_column("URL", style="dim")
+
+                    for source in metadata.sources:
+                        url = source.url or "-"
+                        kind = source.kind.value if source.kind else "unknown"
+                        table.add_row(kind, source.title, url)
+
+                    console.print(table)
+                else:
+                    console.print("[yellow]No sources in this notebook[/yellow]")
 
         return _run()

@@ -5,7 +5,7 @@ from typing import Any
 
 from ._core import ClientCore
 from .rpc import RPCMethod
-from .types import Notebook, NotebookDescription, SuggestedTopic
+from .types import Notebook, NotebookDescription, NotebookMetadata, SuggestedTopic
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +232,33 @@ class NotebooksAPI:
             params,
             source_path=f"/notebook/{notebook_id}",
         )
+
+    async def get_metadata(self, notebook_id: str) -> NotebookMetadata:
+        """Get notebook metadata including sources.
+
+        This provides structured metadata about a notebook including
+        the notebook ID, title, creation/update timestamps, and list
+        of sources with their types and URLs.
+
+        Args:
+            notebook_id: The notebook ID.
+
+        Returns:
+            NotebookMetadata with notebook info and sources.
+
+        Example:
+            metadata = await client.notebooks.get_metadata(notebook_id)
+            print(f"Notebook: {metadata.title}")
+            for source in metadata.sources:
+                print(f"  - {source.title} ({source.kind.value})")
+        """
+        params = [notebook_id, None, [2], None, 0]
+        result = await self._core.rpc_call(
+            RPCMethod.GET_NOTEBOOK,
+            params,
+            source_path=f"/notebook/{notebook_id}",
+        )
+        return NotebookMetadata.from_notebook_response(result)
 
     async def share(
         self, notebook_id: str, public: bool = True, artifact_id: str | None = None
