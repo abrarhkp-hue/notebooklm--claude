@@ -22,15 +22,18 @@ class ResearchAPI:
 
     Usage:
         async with NotebookLMClient.from_storage() as client:
-            # Start research
-            task = await client.research.start(notebook_id, "quantum computing")
+            # Start research (deep mode for comprehensive results)
+            task = await client.research.start(notebook_id, "quantum computing", mode="deep")
 
             # Poll for results
             result = await client.research.poll(notebook_id)
             if result["status"] == "completed":
-                # Import selected sources
+                # Import selected sources AND preserve the deep research report
                 imported = await client.research.import_sources(
-                    notebook_id, task["task_id"], result["sources"][:5]
+                    notebook_id,
+                    task["task_id"],
+                    result["sources"][:5],
+                    report_id=task["report_id"],  # Preserve deep research report
                 )
     """
 
@@ -197,6 +200,8 @@ class ResearchAPI:
         notebook_id: str,
         task_id: str,
         sources: list[dict[str, str]],
+        allow_title_only: bool = False,
+        report_id: str | None = None,
     ) -> list[dict[str, str]]:
         """Import selected research sources into the notebook.
 
@@ -204,6 +209,11 @@ class ResearchAPI:
             notebook_id: The notebook ID.
             task_id: The research task ID.
             sources: List of sources to import, each with 'url' and 'title'.
+            allow_title_only: If True, allow importing sources without URLs
+                (e.g., deep research sources that only have titles).
+            report_id: Optional report ID from deep research to preserve the
+                research report in the notebook. If provided, the deep research
+                report will be preserved after importing sources.
 
         Returns:
             List of imported sources with 'id' and 'title'.
@@ -220,31 +230,56 @@ class ResearchAPI:
             return []
 
         # Filter out sources without URLs - these cause the entire batch to fail
-        valid_sources = [s for s in sources if s.get("url")]
-        skipped_count = len(sources) - len(valid_sources)
-        if skipped_count > 0:
-            logger.warning("Skipping %d source(s) without URLs (cannot be imported)", skipped_count)
+        # However, deep research sources often only have titles without URLs
+        if allow_title_only:
+            valid_sources = sources
+        else:
+            valid_sources = [s for s in sources if s.get("url")]
+            skipped_count = len(sources) - len(valid_sources)
+            if skipped_count > 0:
+                logger.warning("Skipping %d source(s) without URLs (cannot be imported)", skipped_count)
         if not valid_sources:
             return []
 
-        source_array = [
-            [
-                None,
-                None,
-                [src["url"], src.get("title", "Untitled")],
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                2,
-            ]
-            for src in valid_sources
-        ]
+        source_array = []
+        for src in valid_sources:
+            url = src.get("url")
+            title = src.get("title", "Untitled")
+            if url:
+                # Standard source with URL
+                source_array.append([
+                    None,
+                    None,
+                    [url, title],
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    2,
+                ])
+            else:
+                # Title-only source (e.g., deep research results)
+                # Format: [None, title, None, type, ...]
+                source_array.append([
+                    None,
+                    title,
+                    None,
+                    1,  # source type
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    2,
+                ])
 
-        params = [None, [1], task_id, notebook_id, source_array]
+        # Build params: [report_id, [1], task_id, notebook_id, source_array]
+        # report_id is at position 0 to preserve deep research reports
+        params = [report_id, [1], task_id, notebook_id, source_array]
 
         result = await self._core.rpc_call(
             RPCMethod.IMPORT_RESEARCH,
