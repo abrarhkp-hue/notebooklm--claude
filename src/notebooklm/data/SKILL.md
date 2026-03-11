@@ -559,3 +559,43 @@ notebooklm language --help     # Language settings
 **Re-authenticate:** `notebooklm login`
 **Check version:** `notebooklm --version`
 **Update skill:** `notebooklm skill install`
+
+## OpenClaw Integration
+
+This skill also works with **OpenClaw** (openclaw.ai). OpenClaw is an AI assistant platform that supports CLI tools.
+
+### Installation for OpenClaw
+
+1. Install the package:
+```bash
+pip install notebooklm-py
+```
+
+2. Authenticate:
+```bash
+notebooklm login
+```
+
+3. Verify:
+```bash
+notebooklm status
+```
+
+### OpenClaw-Specific Notes
+
+- OpenClaw uses the same CLI interface as Claude Code
+- All commands and workflows documented above apply
+- For OpenClaw skill installation, the skill file is automatically available after pip install
+- Use explicit notebook IDs (`-n <id>`) in parallel workflows to avoid context conflicts
+- JSON output (`--json`) is recommended for programmatic integration
+
+### Example OpenClaw Workflow
+
+```
+User: Create a podcast about machine learning
+Agent: 1. notebooklm create "ML Research"
+       2. notebooklm source add "https://en.wikipedia.org/wiki/Machine_learning"
+       3. notebooklm source wait <source_id>
+       4. notebooklm generate audio "Explain key ML concepts"
+       5. notebooklm download audio ./ml-podcast.mp3
+```

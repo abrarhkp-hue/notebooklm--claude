@@ -95,6 +95,25 @@ pip install "notebooklm-py[browser]"
 playwright install chromium
 ```
 
+### Alternative: uv Installation
+
+[uv](https://github.com/astral-sh/uv) is a fast Python package installer and resolver written in Rust:
+
+```bash
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Basic installation with uv
+uv pip install notebooklm-py
+
+# With browser login support
+uv pip install "notebooklm-py[browser]"
+playwright install chromium
+
+# Development installation
+uv pip install -e ".[all]"
+```
+
 ### Development Installation
 
 For contributors or testing unreleased features:
