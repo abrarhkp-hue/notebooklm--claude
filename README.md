@@ -35,13 +35,14 @@
 
 📥 **Downloads & Export** - Download all generated artifacts locally (MP3, MP4, PDF, PNG, CSV, JSON, Markdown). Export to Google Docs/Sheets. **Features the web UI doesn't offer**: batch downloads, quiz/flashcard export in multiple formats, mind map JSON extraction.
 
-## Three Ways to Use
+## Four Ways to Use
 
 | Method | Best For |
 |--------|----------|
 | **Python API** | Application integration, async workflows, custom pipelines |
 | **CLI** | Shell scripts, quick tasks, CI/CD automation |
 | **Agent Skills** | Claude Code, LLM agents, natural language automation |
+| **MCP Server** | Connect any MCP-compatible client (Claude Desktop, Claude Code, etc.) |
 
 ## Features
 
@@ -93,6 +94,12 @@ pip install notebooklm-py
 # With browser login support (required for first-time setup)
 pip install "notebooklm-py[browser]"
 playwright install chromium
+
+# With MCP server support
+pip install "notebooklm-py[mcp]"
+
+# Everything
+pip install "notebooklm-py[all]"
 ```
 
 ### Development Installation
@@ -208,6 +215,88 @@ notebooklm skill install
 # "Download the quiz as markdown"
 # "/notebooklm generate video"
 ```
+
+### MCP Server
+
+Expose all NotebookLM capabilities to any MCP-compatible client (Claude Desktop, Claude Code, Cursor, etc.) via a local SSE server.
+
+#### Prerequisites
+
+Authenticate before starting the server — the server reads credentials from `~/.notebooklm/storage_state.json`:
+
+```bash
+notebooklm login
+```
+
+#### Local Setup
+
+```bash
+# Install with MCP support
+pip install "notebooklm-py[mcp]"
+
+# Start on localhost only (default, safest)
+notebooklm-mcp
+
+# Expose on the network (required for Docker or remote clients)
+notebooklm-mcp --host 0.0.0.0 --port 8765
+
+# Secure with an API key (recommended when network-exposed)
+notebooklm-mcp --api-key my-secret-key
+# or via environment variable:
+NOTEBOOKLM_MCP_API_KEY=my-secret-key notebooklm-mcp
+```
+
+#### Connect from an MCP Client
+
+```bash
+# Claude Code
+claude mcp add notebooklm --transport sse http://localhost:8765/sse
+
+# Claude Code with API key
+claude mcp add notebooklm --transport sse http://localhost:8765/sse \
+  --header "Authorization: Bearer my-secret-key"
+```
+
+Or add directly to `~/.claude/settings.json` (Claude Code) or your Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "notebooklm": {
+      "url": "http://localhost:8765/sse"
+    }
+  }
+}
+```
+
+#### Docker
+
+```bash
+# 1. Authenticate first (creates ~/.notebooklm/storage_state.json)
+notebooklm login
+
+# 2. Clone and start with Docker Compose
+git clone https://github.com/teng-lin/notebooklm-py
+cd notebooklm-py
+docker compose up
+```
+
+The Docker container mounts `~/.notebooklm` for auth and `~/notebooklm-downloads` for artifact output. To set an API key, add it to a `.env` file before starting:
+
+```bash
+cp .env.example .env
+# Add this line to .env:
+# NOTEBOOKLM_MCP_API_KEY=your-secret-key
+```
+
+#### Configuration
+
+| Environment Variable | Default | Description |
+|---|---|---|
+| `NOTEBOOKLM_MCP_API_KEY` | *(none)* | Bearer token required on all requests |
+| `NOTEBOOKLM_DOWNLOAD_DIR` | `~/notebooklm-downloads` | Directory where generated artifacts are saved |
+
+The server exposes **26 MCP tools** covering notebooks, sources, chat, artifacts, notes, and downloads.
 
 ## Documentation
 
