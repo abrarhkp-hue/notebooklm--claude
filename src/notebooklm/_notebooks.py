@@ -5,6 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from ._core import ClientCore
+from .exceptions import ValidationError
 from .rpc import RPCMethod
 from .types import Notebook, NotebookDescription, SuggestedTopic
 
@@ -12,6 +13,27 @@ if TYPE_CHECKING:
     from ._sources import SourcesAPI
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_notebook_id(notebook_id: str, method_name: str) -> None:
+    """Validate notebook_id is a non-empty string.
+
+    Args:
+        notebook_id: The notebook ID to validate.
+        method_name: Name of the method for error message.
+
+    Raises:
+        ValidationError: If notebook_id is invalid.
+    """
+    if not notebook_id or not isinstance(notebook_id, str):
+        raise ValidationError(
+            f"Invalid notebook_id for {method_name}: must be a non-empty string, "
+            f"got {repr(notebook_id)}"
+        )
+    if len(notebook_id.strip()) == 0:
+        raise ValidationError(
+            f"Invalid notebook_id for {method_name}: cannot be empty or whitespace"
+        )
 
 
 class NotebooksAPI:
@@ -81,6 +103,7 @@ class NotebooksAPI:
         Returns:
             Notebook object with details.
         """
+        _validate_notebook_id(notebook_id, "get()")
         params = [notebook_id, None, [2], None, 0]
         result = await self._core.rpc_call(
             RPCMethod.GET_NOTEBOOK,
@@ -100,6 +123,7 @@ class NotebooksAPI:
         Returns:
             True if deletion succeeded.
         """
+        _validate_notebook_id(notebook_id, "delete()")
         logger.debug("Deleting notebook: %s", notebook_id)
         params = [[notebook_id], [2]]
         await self._core.rpc_call(RPCMethod.DELETE_NOTEBOOK, params)
@@ -115,6 +139,9 @@ class NotebooksAPI:
         Returns:
             The renamed Notebook object (fetched after rename).
         """
+        _validate_notebook_id(notebook_id, "rename()")
+        if not new_title or not isinstance(new_title, str) or len(new_title.strip()) == 0:
+            raise ValidationError("new_title must be a non-empty string")
         logger.debug("Renaming notebook %s to: %s", notebook_id, new_title)
         # Payload format discovered via browser traffic capture:
         # [notebook_id, [[null, null, null, [null, new_title]]]]
@@ -139,6 +166,7 @@ class NotebooksAPI:
         Returns:
             Raw summary text string.
         """
+        _validate_notebook_id(notebook_id, "get_summary()")
         params = [notebook_id, [2]]
         result = await self._core.rpc_call(
             RPCMethod.SUMMARIZE,
@@ -173,6 +201,7 @@ class NotebooksAPI:
             for topic in desc.suggested_topics:
                 print(f"Q: {topic.question}")
         """
+        _validate_notebook_id(notebook_id, "get_description()")
         # Get raw summary data
         params = [notebook_id, [2]]
         result = await self._core.rpc_call(
