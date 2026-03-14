@@ -70,6 +70,7 @@ from .options import (
     standard_options,
     wait_option,
 )
+from .pipeline import pipeline
 from .research import research
 
 # Register functions (top-level command style)
@@ -90,6 +91,7 @@ __all__ = [
     "skill",
     "research",
     "language",
+    "pipeline",
     # Language config
     "get_language",
     # Register functions (top-level command style)
