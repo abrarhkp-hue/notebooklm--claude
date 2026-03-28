@@ -1,6 +1,7 @@
 """Tests for authentication module."""
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -232,11 +233,13 @@ class TestLoadAuthFromEnvVar:
         cookies = load_auth_from_storage(storage_file)
         assert cookies["SID"] == "from_file"
 
-    def test_env_var_invalid_json_raises_value_error(self, monkeypatch):
-        """Test that invalid JSON in env var raises ValueError."""
+    def test_env_var_invalid_json_raises_validation_error(self, monkeypatch):
+        """Test that invalid JSON in env var raises ValidationError."""
+        from notebooklm.exceptions import ValidationError
+
         monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", "not valid json")
 
-        with pytest.raises(ValueError, match="Invalid JSON in NOTEBOOKLM_AUTH_JSON"):
+        with pytest.raises(ValidationError, match="Invalid JSON in NOTEBOOKLM_AUTH_JSON"):
             load_auth_from_storage()
 
     def test_env_var_missing_cookies_raises_value_error(self, monkeypatch):
@@ -265,39 +268,49 @@ class TestLoadAuthFromEnvVar:
         cookies = load_auth_from_storage()
         assert cookies["SID"] == "from_env"
 
-    def test_env_var_empty_string_raises_value_error(self, monkeypatch):
-        """Test that empty string NOTEBOOKLM_AUTH_JSON raises ValueError."""
+    def test_env_var_empty_string_raises_validation_error(self, monkeypatch):
+        """Test that empty string NOTEBOOKLM_AUTH_JSON raises ValidationError."""
+        from notebooklm.exceptions import ValidationError
+
         monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", "")
 
         with pytest.raises(
-            ValueError, match="NOTEBOOKLM_AUTH_JSON environment variable is set but empty"
+            ValidationError, match="NOTEBOOKLM_AUTH_JSON environment variable is set but empty"
         ):
             load_auth_from_storage()
 
-    def test_env_var_whitespace_only_raises_value_error(self, monkeypatch):
-        """Test that whitespace-only NOTEBOOKLM_AUTH_JSON raises ValueError."""
+    def test_env_var_whitespace_only_raises_validation_error(self, monkeypatch):
+        """Test that whitespace-only NOTEBOOKLM_AUTH_JSON raises ValidationError."""
+        from notebooklm.exceptions import ValidationError
+
         monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", "   \n\t  ")
 
         with pytest.raises(
-            ValueError, match="NOTEBOOKLM_AUTH_JSON environment variable is set but empty"
+            ValidationError, match="NOTEBOOKLM_AUTH_JSON environment variable is set but empty"
         ):
             load_auth_from_storage()
 
-    def test_env_var_missing_cookies_key_raises_value_error(self, monkeypatch):
-        """Test that NOTEBOOKLM_AUTH_JSON without 'cookies' key raises ValueError."""
+    def test_env_var_missing_cookies_key_raises_validation_error(self, monkeypatch):
+        """Test that NOTEBOOKLM_AUTH_JSON without 'cookies' key raises ValidationError."""
+        from notebooklm.exceptions import ValidationError
+
         monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", '{"origins": []}')
 
         with pytest.raises(
-            ValueError, match="must contain valid Playwright storage state with a 'cookies' key"
+            ValidationError,
+            match="must contain valid Playwright storage state with a 'cookies' key",
         ):
             load_auth_from_storage()
 
-    def test_env_var_non_dict_raises_value_error(self, monkeypatch):
-        """Test that non-dict NOTEBOOKLM_AUTH_JSON raises ValueError."""
+    def test_env_var_non_dict_raises_validation_error(self, monkeypatch):
+        """Test that non-dict NOTEBOOKLM_AUTH_JSON raises ValidationError."""
+        from notebooklm.exceptions import ValidationError
+
         monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", '["not", "a", "dict"]')
 
         with pytest.raises(
-            ValueError, match="must contain valid Playwright storage state with a 'cookies' key"
+            ValidationError,
+            match="must contain valid Playwright storage state with a 'cookies' key",
         ):
             load_auth_from_storage()
 
@@ -328,18 +341,22 @@ class TestLoadHttpxCookiesWithEnvVar:
         assert cookies.get("__Secure-1PSID", domain=".google.com") == "psid1_val"
 
     def test_env_var_invalid_json_raises(self, monkeypatch):
-        """Test that invalid JSON in NOTEBOOKLM_AUTH_JSON raises ValueError."""
+        """Test that invalid JSON in NOTEBOOKLM_AUTH_JSON raises ValidationError."""
+        from notebooklm.exceptions import ValidationError
+
         monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", "not valid json")
 
-        with pytest.raises(ValueError, match="Invalid JSON in NOTEBOOKLM_AUTH_JSON"):
+        with pytest.raises(ValidationError, match="Invalid JSON in NOTEBOOKLM_AUTH_JSON"):
             load_httpx_cookies()
 
     def test_env_var_empty_string_raises(self, monkeypatch):
-        """Test that empty string NOTEBOOKLM_AUTH_JSON raises ValueError."""
+        """Test that empty string NOTEBOOKLM_AUTH_JSON raises ValidationError."""
+        from notebooklm.exceptions import ValidationError
+
         monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", "")
 
         with pytest.raises(
-            ValueError, match="NOTEBOOKLM_AUTH_JSON environment variable is set but empty"
+            ValidationError, match="NOTEBOOKLM_AUTH_JSON environment variable is set but empty"
         ):
             load_httpx_cookies()
 
@@ -380,11 +397,13 @@ class TestLoadHttpxCookiesWithEnvVar:
         assert cookies.get("evil_cookie", domain=".evil.com") is None
 
     def test_env_var_missing_cookies_key_raises(self, monkeypatch):
-        """Test that storage state without cookies key raises ValueError."""
+        """Test that storage state without cookies key raises ValidationError."""
+        from notebooklm.exceptions import ValidationError
+
         storage_state = {"origins": []}  # Valid JSON but no cookies key
         monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", json.dumps(storage_state))
 
-        with pytest.raises(ValueError, match="must contain valid Playwright storage state"):
+        with pytest.raises(ValidationError, match="must contain valid Playwright storage state"):
             load_httpx_cookies()
 
     def test_env_var_malformed_cookie_objects_skipped(self, monkeypatch):
@@ -1116,3 +1135,98 @@ class TestLoadHttpxCookiesRegional:
 
         cookies = load_httpx_cookies(path=storage_file)
         assert cookies.get("SID", domain=".google.de") == "sid_de"
+
+
+# =============================================================================
+# NOTEBOOKLM_AUTH_JSON SIZE VALIDATION TESTS
+# =============================================================================
+
+
+class TestAuthJsonSizeValidation:
+    """Test NOTEBOOKLM_AUTH_JSON environment variable size validation."""
+
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows environment variables are limited to 32767 characters",
+    )
+    def test_raises_validation_error_for_oversized_auth_json(self, tmp_path, monkeypatch):
+        """Test that oversized NOTEBOOKLM_AUTH_JSON raises ValidationError."""
+        from notebooklm.auth import _load_storage_state
+        from notebooklm.exceptions import ValidationError
+
+        # Create auth JSON larger than 10MB
+        large_json = '{"cookies": [{"name": "SID", "value": "' + "x" * (11 * 1024 * 1024) + '"}]}'
+
+        monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", large_json)
+
+        with pytest.raises(ValidationError, match="too large"):
+            _load_storage_state()
+
+    def test_accepts_auth_json_within_limit(self, tmp_path, monkeypatch, httpx_mock: HTTPXMock):
+        """Test that NOTEBOOKLM_AUTH_JSON within 10MB limit is accepted."""
+        from notebooklm.auth import load_auth_from_storage
+
+        # Create auth JSON under 10MB
+        storage_state = {
+            "cookies": [
+                {"name": "SID", "value": "test_sid_value", "domain": ".google.com"},
+            ]
+        }
+        auth_json = json.dumps(storage_state)
+
+        monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", auth_json)
+
+        # Should not raise
+        cookies = load_auth_from_storage()
+        assert cookies["SID"] == "test_sid_value"
+
+    def test_raises_validation_error_for_empty_auth_json(self, tmp_path, monkeypatch):
+        """Test that empty NOTEBOOKLM_AUTH_JSON raises ValidationError."""
+        from notebooklm.auth import _load_storage_state
+        from notebooklm.exceptions import ValidationError
+
+        monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", "")
+
+        with pytest.raises(ValidationError, match="empty"):
+            _load_storage_state()
+
+    def test_raises_validation_error_for_malformed_auth_json(self, tmp_path, monkeypatch):
+        """Test that malformed JSON in NOTEBOOKLM_AUTH_JSON raises ValidationError."""
+        from notebooklm.auth import _load_storage_state
+        from notebooklm.exceptions import ValidationError
+
+        monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", "{invalid json")
+
+        with pytest.raises(ValidationError, match="Invalid JSON"):
+            _load_storage_state()
+
+    def test_raises_validation_error_for_auth_json_missing_cookies(self, tmp_path, monkeypatch):
+        """Test that NOTEBOOKLM_AUTH_JSON without cookies key raises ValidationError."""
+        from notebooklm.auth import _load_storage_state
+        from notebooklm.exceptions import ValidationError
+
+        monkeypatch.setenv("NOTEBOOKLM_AUTH_JSON", '{"data": "value"}')
+
+        with pytest.raises(ValidationError, match="cookies"):
+            _load_storage_state()
+
+
+# =============================================================================
+# MODULE CONSTANTS TESTS
+# =============================================================================
+
+
+class TestModuleConstants:
+    """Test module-level constants for size limits."""
+
+    def test_max_file_size_constant(self):
+        """Test _MAX_FILE_SIZE constant is defined."""
+        from notebooklm._sources import _MAX_FILE_SIZE
+
+        assert _MAX_FILE_SIZE == 200 * 1024 * 1024  # 200MB
+
+    def test_max_auth_json_size_constant(self):
+        """Test _MAX_AUTH_JSON_SIZE constant is defined."""
+        from notebooklm.auth import _MAX_AUTH_JSON_SIZE
+
+        assert _MAX_AUTH_JSON_SIZE == 10 * 1024 * 1024  # 10MB
