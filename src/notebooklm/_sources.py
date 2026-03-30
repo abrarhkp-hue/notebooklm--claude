@@ -28,6 +28,9 @@ from .types import (
 
 logger = logging.getLogger(__name__)
 
+# Maximum file size for uploads (200MB - NotebookLM's typical limit)
+_MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB
+
 
 class SourcesAPI:
     """Operations on NotebookLM sources.
@@ -432,6 +435,15 @@ class SourcesAPI:
         filename = file_path.name
         # Get file size without loading into memory
         file_size = file_path.stat().st_size
+
+        # Check file size limit
+        if file_size > _MAX_FILE_SIZE:
+            size_mb = file_size / 1024 / 1024
+            max_mb = _MAX_FILE_SIZE / 1024 / 1024
+            raise ValidationError(
+                f"File too large: {size_mb:.1f}MB (max {max_mb:.0f}MB). "
+                "NotebookLM typically rejects files larger than 200MB."
+            )
 
         # Step 1: Register source intent with RPC → get SOURCE_ID
         source_id = await self._register_file_source(notebook_id, filename)
