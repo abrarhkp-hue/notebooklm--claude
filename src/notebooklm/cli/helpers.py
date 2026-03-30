@@ -306,9 +306,10 @@ async def _resolve_partial_id(
 
     Allows users to type partial IDs like 'abc' instead of full UUIDs.
     Matches are case-insensitive prefix matches.
+    Also supports searching by title (prefix match, case-insensitive).
 
     Args:
-        partial_id: Full or partial ID to resolve
+        partial_id: Full or partial ID to resolve, or title to search
         list_fn: Async function that returns list of items with id/title attributes
         entity_name: Name for error messages (e.g., "notebook", "source")
         list_command: CLI command to list items (e.g., "list", "source list")
@@ -327,7 +328,13 @@ async def _resolve_partial_id(
         return partial_id
 
     items = await list_fn()
+    
+    # First try ID prefix match
     matches = [item for item in items if item.id.lower().startswith(partial_id.lower())]
+    
+    # If no ID matches, try title prefix match
+    if len(matches) == 0:
+        matches = [item for item in items if item.title and item.title.lower().startswith(partial_id.lower())]
 
     if len(matches) == 1:
         if matches[0].id != partial_id:
@@ -336,11 +343,11 @@ async def _resolve_partial_id(
         return matches[0].id
     elif len(matches) == 0:
         raise click.ClickException(
-            f"No {entity_name} found starting with '{partial_id}'. "
+            f"No {entity_name} found matching '{partial_id}'. "
             f"Run 'notebooklm {list_command}' to see available {entity_name}s."
         )
     else:
-        lines = [f"Ambiguous ID '{partial_id}' matches {len(matches)} {entity_name}s:"]
+        lines = [f"Ambiguous input '{partial_id}' matches {len(matches)} {entity_name}s:"]
         for item in matches[:5]:
             title = item.title or "(untitled)"
             lines.append(f"  {item.id[:12]}... {title}")
